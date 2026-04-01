@@ -11,19 +11,7 @@ venv/
 
 # Data folders
 data/processed/
-data/external/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
-# Results and outputs
-results/
-*.log
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/

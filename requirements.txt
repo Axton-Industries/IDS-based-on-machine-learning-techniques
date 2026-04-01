@@ -1,1 +1,5 @@
-#Needed to execute the code
+pandas
+numpy
+scikit-learn
+matplotlib
+jupyter
