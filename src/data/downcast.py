@@ -1,21 +1,36 @@
 import pandas as pd
 import numpy as np
 
-
 def get_non_downcastable_columns(df: pd.DataFrame):
     """
-    Returns columns that cannot be safely downcasted.
+    Returns columns that cannot be safely downcasted to 32-bit types.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+
+    Returns
+    -------
+    tuple: (cannot_downcast_int, cannot_downcast_float)
     """
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+
+    # Select ALL numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
 
     cannot_downcast_int = []
     cannot_downcast_float = []
 
     for col in numeric_cols:
-        min_val = df[col].min()
-        max_val = df[col].max()
+        series = df[col]
 
-        if pd.api.types.is_integer_dtype(df[col]):
+        # Skip empty or all-NaN columns
+        if series.dropna().empty:
+            continue
+
+        min_val = series.min(skipna=True)
+        max_val = series.max(skipna=True)
+
+        if pd.api.types.is_integer_dtype(series):
             fits_uint32 = min_val >= 0 and max_val <= np.iinfo(np.uint32).max
             fits_int32 = (
                 min_val >= np.iinfo(np.int32).min
@@ -32,18 +47,21 @@ def get_non_downcastable_columns(df: pd.DataFrame):
                 and max_val <= np.finfo(np.float32).max
             )
 
-            # Precision check (THIS is what you were missing)
+            # Precision check (with NaN handling)
             as_float32 = series.astype(np.float32)
-            precision_ok = np.allclose(series, as_float32, rtol=1e-05, atol=1e-08)
+            precision_ok = np.allclose(
+                series, as_float32, rtol=1e-05, atol=1e-08, equal_nan=True
+            )
 
             if not (in_range and precision_ok):
                 cannot_downcast_float.append(col)
 
-        print("Columnas enteras que NO se pueden downcast:")
-        print(cannot_downcast_int)
 
-        print("\nColumnas float que NO se pueden downcast:")
-        print(cannot_downcast_float)
+    print("Columnas enteras que NO se pueden downcast:")
+    print(cannot_downcast_int)
+
+    print("\nColumnas float que NO se pueden downcast:")
+    print(cannot_downcast_float)
 
     return cannot_downcast_int, cannot_downcast_float
 
