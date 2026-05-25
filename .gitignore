@@ -11,6 +11,7 @@ venv/
 
 # Data folders
 data/processed/
+data/modeling/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
