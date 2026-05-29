@@ -22,7 +22,6 @@ def load_and_merge_csvs(dir: str | Path) -> pd.DataFrame:
     df_list = []
     for file in csv_files:
         df = pd.read_csv(file)
-        df['source_file'] = file.stem
         df_list.append(df)
 
     merged_df = pd.concat(df_list, ignore_index=True)
