@@ -1,16 +1,20 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
 from sklearn.metrics import (
     precision_recall_curve,
     average_precision_score,
     confusion_matrix,
     classification_report,
     roc_auc_score,
-    accuracy_score
+    accuracy_score,
+    ConfusionMatrixDisplay,
+    RocCurveDisplay,
+    PrecisionRecallDisplay
 )
 
 # =========================================================
 # BINARY / SCORE-BASED MODELS
-# RF, XGBoost, Isolation Forest, Autoencoder
 # =========================================================
 def evaluate_binary(scores, y_test):
 
@@ -23,14 +27,38 @@ def evaluate_binary(scores, y_test):
     y_pred = (scores >= best_threshold).astype(int)
 
     print("\nBest threshold:", best_threshold)
-    print("\n=== CONFUSION MATRIX ===")
-    print(confusion_matrix(y_test, y_pred))
 
+    # ---------------- CONFUSION MATRIX ----------------
+    cm = confusion_matrix(y_test, y_pred)
+    print("\n=== CONFUSION MATRIX ===")
+    print(cm)
+
+    cm = confusion_matrix(y_test, y_pred, normalize="true")
+    print("\n=== CONFUSION MATRIX (ROW-NORMALIZED) ===")
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap="Blues", values_format=".2%")
+    plt.title("Confusion Matrix (Binary, % per true class)")
+    plt.show()
+
+    # ---------------- CLASSIFICATION REPORT ----------------
     print("\n=== CLASSIFICATION REPORT ===")
     print(classification_report(y_test, y_pred))
 
-    print("\nROC-AUC:", roc_auc_score(y_test, scores))
+    # ---------------- ROC CURVE ----------------
+    roc_auc = roc_auc_score(y_test, scores)
+    print("\nROC-AUC:", roc_auc)
+
+    RocCurveDisplay.from_predictions(y_test, scores)
+    plt.title(f"ROC Curve (AUC = {roc_auc:.4f})")
+    plt.show()
+
+    # ---------------- PR CURVE ----------------
     print("PR-AUC:", pr_auc)
+
+    PrecisionRecallDisplay.from_predictions(y_test, scores)
+    plt.title(f"Precision-Recall Curve (AP = {pr_auc:.4f})")
+    plt.show()
 
 
 # =========================================================
@@ -40,9 +68,17 @@ def evaluate_multiclass(model, X_test, y_test):
 
     y_pred = model.predict(X_test)
 
+    # ---------------- CONFUSION MATRIX ----------------
+    cm = confusion_matrix(y_test, y_pred)
     print("\n=== CONFUSION MATRIX ===")
-    print(confusion_matrix(y_test, y_pred))
+    print(cm)
 
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap="Blues", xticks_rotation=45)
+    plt.title("Confusion Matrix (Multiclass)")
+    plt.show()
+
+    # ---------------- CLASSIFICATION REPORT ----------------
     print("\n=== CLASSIFICATION REPORT ===")
     print(classification_report(y_test, y_pred))
 
