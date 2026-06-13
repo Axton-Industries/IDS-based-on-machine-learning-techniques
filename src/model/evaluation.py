@@ -114,7 +114,7 @@ def evaluate_binary(scores, y_test, chosen_threshold):
 # =========================================================
 # MULTICLASS SUPERVISED MODELS ONLY
 # =========================================================
-def evaluate_multiclass(model, X_test, y_test, benign_threshold=0.85, benign_class_index=0):
+def evaluate_multiclass(model, X_test, y_test, benign_class_index=0):
     # 1. Handle inference safely
     if hasattr(model, "get_booster"):
         probs = model.get_booster().inplace_predict(
@@ -125,49 +125,44 @@ def evaluate_multiclass(model, X_test, y_test, benign_threshold=0.85, benign_cla
     else:
         probs = model.predict_proba(X_test)
 
-    # 2. Convert raw probability vectors to hard class predictions
-    benign_probs = probs[:, benign_class_index]
-    y_pred = np.zeros(len(probs), dtype=int)
-
-    for i in range(len(probs)):
-        if benign_probs[i] > benign_threshold:
-            y_pred[i] = benign_class_index
-        else:
-            attack_probs = np.copy(probs[i])
-            attack_probs[benign_class_index] = -1.0
-            y_pred[i] = np.argmax(attack_probs)
+    # 2 Extract theoretical classes from probabilities array shape
+    # and get hard class predictions using the most probable classification
+    n_classes = probs.shape[1]
+    all_classes = np.arange(n_classes)
+    y_pred = np.argmax(probs, axis=1)
 
     # ---------------- CONFUSION MATRIX ----------------
-    cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred, labels=all_classes)
     print("\n=== CONFUSION MATRIX ===")
     print(cm)
 
     # Normalized by 'true' rows so tiny attack categories aren't hidden by massive benign traffic
-    cm_normalized = confusion_matrix(y_test, y_pred, normalize='true')
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm_normalized)
+    cm_normalized = confusion_matrix(y_test, y_pred, labels=all_classes, normalize='true')
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm_normalized, display_labels=all_classes)
     disp.plot(cmap="Blues", xticks_rotation=45, values_format=".1%")
     plt.title("Normalized Confusion Matrix (Recall per Class)")
     plt.show()
 
     # ---------------- CLASSIFICATION REPORT ----------------
     print("\n=== CLASSIFICATION REPORT ===")
-    print(classification_report(y_test, y_pred))
+    # CHANGED: Added labels and zero_division control to avoid metric layout drops
+    print(classification_report(y_test, y_pred, labels=all_classes, zero_division=0))
 
     print("\nAccuracy:", accuracy_score(y_test, y_pred))
 
     # ---------------- MULTICLASS ROC & PR CURVES (One-vs-Rest) ----------------
-    # Extract unique classes present in the test labels
-    unique_classes = np.unique(y_test)
-
-    # CHANGED: Streamlined binarization directly since classes > 2 is guaranteed.
-    # This maps your classes cleanly to a 2D matrix of shape (n_samples, n_classes)
-    y_test_binarized = label_binarize(y_test, classes=unique_classes)
+    # Binarize against all theoretical classes to match probability matrix columns
+    y_test_binarized = label_binarize(y_test, classes=all_classes)
 
     fig, ax = plt.subplots(1, 2, figsize=(16, 6))
 
     # --- Plot ROC Curves ---
-    for i, class_val in enumerate(unique_classes):
-        label_name = "Benign" if class_val == benign_class_index else f"Attack Class {class_val}"
+    # Loop over all_classes and added condition to skip unrepresented classes in test split
+    for i in all_classes:
+        if np.sum(y_test == i) == 0:
+            continue
+
+        label_name = "Benign" if i == benign_class_index else f"Attack Class {i}"
         fpr, tpr, _ = roc_curve(y_test_binarized[:, i], probs[:, i])
         roc_auc = auc(fpr, tpr)
         ax[0].plot(fpr, tpr, label=f"{label_name} (AUC = {roc_auc:.4f})")
@@ -181,10 +176,13 @@ def evaluate_multiclass(model, X_test, y_test, benign_threshold=0.85, benign_cla
     ax[0].grid(True, alpha=0.3)
 
     # --- Plot Precision-Recall Curves ---
-    for i, class_val in enumerate(unique_classes):
-        label_name = "Benign" if class_val == benign_class_index else f"Attack Class {class_val}"
+    # Loop over all_classes and added condition to skip unrepresented classes in test split
+    for i in all_classes:
+        if np.sum(y_test == i) == 0:
+            continue
+
+        label_name = "Benign" if i == benign_class_index else f"Attack Class {i}"
         precision, recall, _ = precision_recall_curve(y_test_binarized[:, i], probs[:, i])
-        # CHANGED: Updated to use the correct function name 'average_precision_score'
         avg_pr = average_precision_score(y_test_binarized[:, i], probs[:, i])
         ax[1].plot(recall, precision, label=f"{label_name} (AP = {avg_pr:.4f})")
 
